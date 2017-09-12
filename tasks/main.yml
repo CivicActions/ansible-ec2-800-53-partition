@@ -1,0 +1,45 @@
+- name: Copy files to temporary target mount
+  command: "/usr/bin/rsync --archive --hard-links {% if filesystem == 'xfs' %}--acls --xattrs{% endif %} /home /var /mnt/target/"
+- name: Cleanup /mnt/target directory mounts
+  command: "umount /dev/mapper/primary-varlogaudit /dev/mapper/primary-varlog /dev/mapper/primary-var /dev/mapper/primary-home /dev/mapper/primary-tmp"
+- name: Cleanup /mnt/target directory
+  file: path="/mnt/target" state=absent
+- name: Ensure systemd permits mounting of tmp by unmasking tmp.mount unit
+  systemd: name=tmp.mount enabled=yes masked=no
+  when: ansible_os_family == "RedHat" and ansible_lsb.major_release|int >= 7
+- name: Mark filesystem as needing relabel
+  file: path=/.autorelabel state=touch owner=root
+- name: Update fstab to mount new partitions in final locations
+  replace: dest=/etc/fstab regexp='/mnt/target/' replace='/'
+- name: Adjust root partition mount options
+  lineinfile:
+    dest: /etc/fstab
+    regexp: '^(.+\s/\s+ext4\s+)\S+(.+)$'
+    line: "\\1 defaults,{{ mount_options }} \\2"
+- name: Add service to delete mountpoint contents before shutdown
+  copy: src=shutdown-cleanup.service dest=/etc/systemd/system/shutdown-cleanup.service 
+  when: ansible_os_family == "RedHat" and ansible_lsb.major_release|int >= 7
+- name: Start shutdown-cleanup service
+  service: name=shutdown-cleanup state=started
+  when: ansible_os_family == "RedHat" and ansible_lsb.major_release|int >= 7
+- name: Add rc.local task to delete mountpoint contents on next boot
+  lineinfile:
+    dest: /etc/rc.local
+    line: mount --bind / /mnt && find /mnt/var /mnt/home /mnt/tmp ! -path /mnt/var ! -path /mnt/home ! -path /mnt/tmp -delete && umount /mnt && sed -i "/ansible-ec2-800-53-partition/d" /etc/rc.local
+  when: ansible_os_family == "RedHat" and ansible_lsb.major_release|int < 7
+- name: Fetch instance details
+  ec2_remote_facts:
+    filters:
+      instance-state-name: running
+      "tag:Name": "{{ inventory_hostname }}"
+  register: ec2
+  delegate_to: localhost
+- name: Restart existing instance
+  ec2:
+    state: 'restarted'
+    wait: true
+    instance_id: '{{ ec2.instances[0].id }}'
+  delegate_to: localhost
+- name: Wait for SSH to come up
+  wait_for: host={{ ec2.instances[0].public_ip_address }} port=22 delay=30 timeout=640 search_regex=OpenSSH
+  delegate_to: localhost

@@ -1,0 +1,14 @@
+[Unit]
+Description=Cleanup files from mount points that have been migrated to dedicated partitions, then remove service.
+Before=initrd-cleanup.service systemd-tmpfiles-setup.service systemd-random-seed.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/bin/true
+ExecStop=/bin/find /var /home /tmp ! -path /var ! -path /home ! -path /tmp -delete
+ExecStop=/bin/systemctl disable shutdown-cleanup
+ExecStop=/bin/rm /etc/systemd/system/shutdown-cleanup.service
+
+[Install]
+WantedBy=multi-user.target

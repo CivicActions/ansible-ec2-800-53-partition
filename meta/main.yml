@@ -1,0 +1,69 @@
+---
+galaxy_info:
+  author: Owen Barton
+  company: CivicActions
+  license: BSD
+  min_ansible_version: 2.2
+  platforms:
+  - name: EL
+    versions:
+    - 6
+    - 7
+  galaxy_tags:
+    - system
+  description: Role to LVM partition a prepared EC2 instance. Generally called from the main ansible-ec2-800-53 role (https://github.com/CivicActions/ansible-ec2-800-53/).
+  company: CivicActions
+  license: BSD
+  min_ansible_version: 2.2
+  platforms:
+  - name: EL
+    versions:
+    - 6
+    - 7
+  galaxy_tags:
+    - system
+    - lvm
+
+dependencies:
+  - role: HanXHX.lvm
+    lvm_apply: true
+    lvm_groups:
+    - vgname: "primary"
+      disks: "/dev/xvda{{ ansible_devices.xvda.partitions|length }}"
+      create: true
+      lvnames:
+      - lvname: "home"
+        size: "{{ home }}g"
+        create: true
+        filesystem: "{{ filesystem }}"
+        mount: true
+        mount_point: "/mnt/target/home"
+        mount_options: "defaults,nodev,{{ mount_options }}"
+      - lvname: "var"
+        size: "{{ var }}g"
+        create: true
+        filesystem: "{{ filesystem }}"
+        mount: true
+        mount_point: "/mnt/target/var"
+        mount_options: "defaults,nodev,{{ mount_options }}"
+      - lvname: "varlog"
+        size: "{{ varlog }}g"
+        create: true
+        filesystem: "{{ filesystem }}"
+        mount: true
+        mount_point: "/mnt/target/var/log"
+        mount_options: "defaults,nodev,noexec,nosuid,{{ mount_options }}"
+      - lvname: "varlogaudit"
+        size: "{{ varlogaudit }}g"
+        create: true
+        filesystem: "{{ filesystem }}"
+        mount: true
+        mount_point: "/mnt/target/var/log/audit"
+        mount_options: "defaults,nodev,noexec,nosuid,{{ mount_options }}"
+      - lvname: "tmp"
+        size: "{{ tmp }}g"
+        create: true
+        filesystem: "{{ filesystem }}"
+        mount: true
+        mount_point: "/mnt/target/tmp"
+        mount_options: "defaults,nodev,noexec,nosuid,{{ mount_options }}"
